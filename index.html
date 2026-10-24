@@ -1,0 +1,763 @@
+<title>YJ79 插齿原理机</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 布局：上方分段标签；左侧 3D 舞台，右侧同一分段的国标运动简图与零件表；窄屏上下堆叠 */
+:root{
+  --bg:#f3f5f6; --panel:#ffffff; --ink:#1d2730; --mute:#5d6b76; --line:#d5dbe0; --stage:#e9edef;
+  --pub:#b8860b; --gen:#13806f; --cut:#c23b52; --feed:#5a4bc4; --accent:#1d4e89;
+  --draw:#17212a; --paper:#fbfcfc;
+  --font:'Noto Sans SC',system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12181d; --panel:#1a2229; --ink:#e4eaee; --mute:#93a1ac; --line:#2c3842; --stage:#0f151a;
+  --pub:#e3b341; --gen:#3cc0ad; --cut:#ef7b8f; --feed:#9a8cf5; --accent:#7db3f0; --draw:#dfe7ec; --paper:#1a2229; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12181d; --panel:#1a2229; --ink:#e4eaee; --mute:#93a1ac; --line:#2c3842; --stage:#0f151a;
+  --pub:#e3b341; --gen:#3cc0ad; --cut:#ef7b8f; --feed:#9a8cf5; --accent:#7db3f0; --draw:#dfe7ec; --paper:#1a2229; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 28px}
+.wrap{max-width:1480px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+h1{font-size:22px;margin:0;font-weight:700;letter-spacing:.02em}
+header p{margin:0;color:var(--mute);font-size:13px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px}
+.tabs button{font:inherit;font-size:14px;padding:8px 16px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;cursor:pointer;display:flex;gap:8px;align-items:center}
+.tabs button i{width:10px;height:10px;border-radius:50%;background:var(--c,var(--mute))}
+.tabs button[aria-pressed="true"]{border-color:var(--c,var(--accent));box-shadow:inset 0 -3px 0 var(--c,var(--accent));font-weight:700}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:980px){.grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.hint{display:none}#info{left:10px;text-align:left;white-space:normal}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:0}
+.stage{position:relative;width:100%;box-sizing:border-box;height:clamp(340px,78vw,640px);max-height:78vh;overflow:hidden;border-radius:8px;background:var(--stage)}
+#gl{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lb{position:absolute;left:0;top:0;font:500 11px var(--mono);background:var(--panel);color:var(--ink);border:1px solid var(--ink);border-radius:9px;padding:0 5px;line-height:16px;white-space:nowrap}
+.lb.dim{opacity:.25}
+.hint{position:absolute;left:10px;bottom:8px;font-size:11px;color:var(--mute)}
+#info{position:absolute;right:10px;bottom:8px;font:11px var(--mono);color:var(--mute);text-align:right}
+.ctl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:10px 12px;font-size:13px}
+.ctl button{font:inherit;font-size:13px;padding:5px 11px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:5px;cursor:pointer}
+.ctl label{display:flex;gap:6px;align-items:center;color:var(--mute)}
+.ctl input[type=range]{width:120px}
+.sp{flex:1}
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.dwg{padding:12px 12px 8px}
+.dwg h2{font-size:15px;margin:0 0 2px}
+.dwg .sub{font-size:12px;color:var(--mute);margin:0 0 6px}
+.dwg svg{width:100%;height:auto;display:block;color:var(--draw)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mute);font-weight:500}
+td.n{font-family:var(--mono);width:44px}
+tr.off{opacity:.35}
+.note{padding:10px 14px;font-size:12.5px;color:var(--mute);line-height:1.7}
+.note b{color:var(--ink)}
+.sh{stroke:var(--draw);stroke-width:3;fill:none}.sh0{fill:var(--paper);stroke:var(--draw);stroke-width:1.6}.dot{fill:var(--draw)}
+.t{stroke:var(--draw);stroke-width:1.5;fill:none}.cl{stroke:var(--draw);stroke-width:1.1;fill:none;stroke-dasharray:9 3 2 3}
+.ch{stroke:var(--draw);stroke-width:1.2;fill:none;stroke-dasharray:9 3 2 3 2 3}.lead{stroke:var(--mute);stroke-width:.8}
+.nb{fill:var(--paper);stroke:var(--draw);stroke-width:1.2}.nt{font:600 11px var(--font);fill:var(--draw)}.tx{font:12px var(--font);fill:var(--draw)}.tx.s{font-size:10px;fill:var(--mute)}
+.ar{stroke:var(--cut);stroke-width:1.6;fill:none}.arh{fill:var(--cut)}
+</style>
+<div class="wrap">
+  <header><h1>YJ79 型齿廓范成原理投影插齿机</h1><p>3D 模型与国标运动简图共用同一套布局和传动比，转向、传动比以模型为准核对</p></header>
+  <div class="tabs" role="group" aria-label="运动部分">
+    <button data-sec="all" aria-pressed="true">整机</button>
+    <button data-sec="pub" style="--c:var(--pub)"><i></i>公共传动部分</button>
+    <button data-sec="gen" style="--c:var(--gen)"><i></i>范成运动</button>
+    <button data-sec="cut" style="--c:var(--cut)"><i></i>切削运动</button>
+    <button data-sec="feed" style="--c:var(--feed)"><i></i>进给运动</button>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <div class="stage"><canvas id="gl"></canvas><div id="labels"></div><svg id="gizmo" viewBox="0 0 64 64" width="64" height="64" style="position:absolute;left:8px;top:8px;pointer-events:none"><g stroke-width="2" stroke-linecap="round"><line class="gX" x1="32" y1="32" x2="54" y2="32" stroke="var(--cut)"/><line class="gY" x1="32" y1="32" x2="54" y2="32" stroke="var(--gen)"/><line class="gZ" x1="32" y1="32" x2="32" y2="10" stroke="var(--feed)"/></g><g font-size="10" font-family="var(--mono)" fill="var(--ink)" text-anchor="middle"><text class="tX">X</text><text class="tY">Y</text><text class="tZ">Z</text></g></svg><div class="hint">拖动旋转 · 滚轮缩放 · Shift/右键平移</div><div id="info"></div></div>
+      <div class="ctl">
+        <button data-view="iso">示意图视角</button><button data-view="front">前视</button><button data-view="top">俯视</button><button data-view="left">左视</button><button data-view="back">后视</button>
+        <span class="sp"></span>
+        <label><input type="checkbox" id="lbl" checked>编号</label>
+        <label>速度<input type="range" id="speed" min="0.02" max="3" step="0.02" value="0.4"></label>
+        <button id="play">暂停</button>
+      </div>
+    </div>
+    <div class="side">
+      <div class="card dwg" id="dwg"></div>
+      <div class="card scroll"><table id="tbl"></table></div>
+    </div>
+  </div>
+  <div class="card note" id="note"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* YJ79 数据层：布局常量 + 传动比（3D 与运动简图共用）
+   世界坐标(mm)：X 向右前(屏幕右下)，Y 向右后(屏幕右上)，Z 向上，右手系 */
+const YJ = (() => {
+  const P = {}; // 几何/齿数常量
+  P.m = 2.5;
+  // 轴线：axis 方向 + 通过点
+  P.I   = {ax:'X', Y:26,    Z:-6};
+  P.II  = {ax:'X', Y:-50.4, Z:70.4};
+  P.III = {ax:'Y', X:-175,  Z:70.4};
+  P.W   = {ax:'Z', X:-135,  Y:69.6};
+  P.IV  = {ax:'X', Y:69.6,  Z:210};
+  P.VI  = {ax:'X', Y:69.6,  Z:60};
+  P.VII = {ax:'X', Y:69.6,  Z:130};            // 箱体内蜗杆轴(随箱体上下)
+  P.S   = {ax:'Z', X:60,    Y:109.6};          // 插齿刀主轴
+  P.C   = {ax:'Y', X:60,    Z:380};            // 曲柄轴
+  P.M   = {ax:'X', Y:176,   Z:-165};           // 电机轴
+  P.T   = {ax:'X', Y:260,   Z:-55};            // 链19从动轴(伸缩轴一端)
+  // 齿数 / 半径
+  P.z = {z3:48, z4:24, z5:24, z7w:20, z8:24, z9a:75, z9b:45, zsp:20, zc:20, zw:40, ztw:40};
+  P.r = {P1:20, P2:60, F:34, z3:72, z4:36, b5:34, worm7:15, ww:25, b8:30,
+         z9a:93.75, z9b:56.25, S11:24, worm11:15, sp:25, cutter:25, work:50,
+         S10a:36, S10b:36, S19a:50, S19b:30, worm22:15, tw:50};
+  P.stroke = {e:12, L:150, Zrod0:230, boxZ0:130};
+  P.feed = {a0:82, amp:6.15, e:5, kLever:1.23};
+  P.cutterZ0 = -20; P.blankTop = -18;
+  P.cx = 60;   // 刀/坯 X
+  P.Yc0 = P.S.Y; // 刀 Y
+
+  // ===== 传动比：以电动机转角 φM 为基准，其余 = k × φM（绕各自 +轴方向，右手）=====
+  const k = {};
+  k.M = 1;                                   // 电机轴、小带轮 1
+  k.I = k.M * P.r.P1 / P.r.P2;               // 带传动，同向
+  k.II = -k.I * P.z.z3 / P.z.z4;             // 外啮合圆柱齿轮，反向
+  k.III = -k.II;                             // 等径锥齿轮(两轴矢量均指向齿轮体)：反向
+  // 蜗杆7(轴Y,右旋) → 蜗轮(轴Z,位于蜗杆+X侧)：s=sign(nw·(nwh×c)) = Y·(Z×X)=+1
+  k.W = k.III * (1 / P.z.z7w);
+  // 蜗轮轴W(+Z) → 8b(体向-Z) → 8a(体向+X) 轴IV
+  k.IV = k.W;                                // 推导见说明：ω_IV=+ω_W
+  k.S10b = k.III * P.r.S10a / P.r.S10b;      // 链10 同向(轴均沿 Y)
+  k.C = k.S10b;
+  k.VI = -k.IV * P.z.z9a / P.z.z9b;          // 挂轮 9a→9b 外啮合
+  k.VII = k.VI;                              // 链11，同向
+  // 蜗杆11(轴X,右旋) → 蜗轮(轴Z,位于蜗杆+Y侧)：Z×Y=-X → s=-1
+  k.SP = -k.VII / P.z.zsp;
+  k.T = k.IV * P.r.S19a / P.r.S19b;          // 链19，同向
+  // 蜗杆22(轴X)→ 工作台蜗轮(轴Z,位于蜗杆-Y侧): c=-Y → Z×(-Y)=+X → s=+1(右旋)
+  k.TBraw = k.T / P.z.ztw;                    // 右旋蜗杆22时工作台的转角系数
+  k.table = k.SP * -P.z.zc / P.z.zw;          // 范成条件：工作台与刀反向，转速比 zc/zw
+  k.sign22 = Math.sign(k.table / k.TBraw);    // +1 右旋 / -1 左旋
+  YJ_check = {rawTable: k.TBraw, table: k.table, ratio: k.table / k.TBraw};
+  k.crank = k.C; k.feedCrank = k.T;
+  return {P, k, check: YJ_check};
+})();
+var YJ_check;
+/* 零件注册表：id、名称、类型、所属运动部分 */
+YJ.SEC = {pub:'公共传动部分', gen:'范成运动', cut:'切削运动', feed:'进给运动'};
+YJ.PARTS = [
+ ['1','电动机(含小带轮)','电动机','pub'],
+ ['2','V带及大带轮(Ⅰ轴)','带传动','pub'],
+ ['F','飞轮','飞轮','pub'],
+ ['3','大圆柱齿轮(Ⅰ轴)','圆柱齿轮','pub'],
+ ['4','小圆柱齿轮(Ⅱ轴)','圆柱齿轮','pub'],
+ ['5','锥齿轮副(5a在Ⅱ轴,5b在Ⅲ轴)','锥齿轮','pub gen cut feed'],
+ ['6','Ⅲ轴(带支架)','轴','pub gen cut feed'],
+ ['7','蜗杆(Ⅲ轴)','蜗杆','gen feed'],
+ ['7w','蜗轮(W轴)','蜗轮','gen feed'],
+ ['8','锥齿轮副(W轴/Ⅳ轴)','锥齿轮','gen feed'],
+ ['9','挂轮9a/9b','圆柱齿轮','gen'],
+ ['10','链传动10(Ⅲ轴→曲柄轴)','链传动','cut'],
+ ['11','链11+箱内蜗杆11','链传动/蜗杆','gen'],
+ ['12','曲柄及连杆','曲柄连杆','cut'],
+ ['13','刀架箱体(上下往复)','滑块','cut gen'],
+ ['14','插齿刀(刀轴)','插齿刀','gen cut'],
+ ['15','轮坯(工作台)','工件','gen'],
+ ['C','工作台滑板','滑板','feed gen'],
+ ['16','推杆滚子','推杆','feed'],
+ ['17','摇杆支点立柱','机架','feed'],
+ ['18','摇杆','摇杆','feed'],
+ ['19','链传动19(Ⅳ轴→伸缩轴)','链传动','gen feed'],
+ ['20','连杆','连杆','feed'],
+ ['21','伸缩传动轴/曲柄','轴','gen feed'],
+ ['22','工作台蜗杆','蜗杆','gen'],
+ ['23','回位弹簧','弹簧','feed'],
+];
+
+/* three.js 辅助：世界(X,Y,Z右手,Z上) → three(x,y,z)=(X,Z,-Y) */
+const T3 = THREE;
+const W = (X,Y,Z) => new T3.Vector3(X, Z, -Y);
+const AX = {X:new T3.Vector3(1,0,0), Y:new T3.Vector3(0,0,-1), Z:new T3.Vector3(0,1,0)};
+const PAL = {steel:0x8f989f, dark:0x39414a, green:0x7fa88c, brass:0xb98a4a, red:0xb5483f, rubber:0x20262c, chain:0x6b7480, cast:0x9db8a4, blank:0xc9b37a};
+const Q0 = new T3.Quaternion();
+const meshes = [];                      // 所有可着色网格
+function mat(color, o={}) { return new T3.MeshStandardMaterial(Object.assign({color, roughness:.55, metalness:.35, flatShading:true}, o)); }
+function reg(mesh, parts, color) { mesh.userData.parts = [].concat(parts); mesh.userData.base = color; meshes.push(mesh); return mesh; }
+function add(g, geo, color, parts, pos, rot) {
+  const m = reg(new T3.Mesh(geo, mat(color)), parts, color);
+  if (pos) m.position.set(pos[0], pos[1], pos[2]);
+  if (rot) m.rotation.set(rot[0], rot[1], rot[2]);
+  g.add(m); return m;
+}
+/* 旋转体：root 的局部 +z 对准 axis(dir=-1 则反向)，spin 绕局部 z 转动 */
+const bodies = [];
+function body(scene, id, axis, c, kk, dir=1) {
+  const root = new T3.Group(); root.position.copy(W(c[0],c[1],c[2]));
+  const a = AX[axis].clone().multiplyScalar(dir);
+  root.quaternion.setFromUnitVectors(new T3.Vector3(0,0,1), a);
+  const spin = new T3.Group(); root.add(spin); scene.add(root);
+  const b = {root, spin, k:kk, dir, phase:0, id}; bodies.push(b); return b;
+}
+/* 圆柱齿轮/链轮轮廓：z 个齿，节圆半径 rp，模数 m */
+function gearGeo(z, rp, w, m=2.5) {
+  const ra = rp + m, rf = rp - 1.25*m, p = 2*Math.PI/z, s = new T3.Shape();
+  for (let i=0;i<z;i++) {
+    const a = i*p;
+    [[rf,-.26],[ra,-.12],[ra,.12],[rf,.26]].forEach(([r,f],j)=>{
+      const x = r*Math.cos(a+f*p), y = r*Math.sin(a+f*p);
+      (i===0&&j===0) ? s.moveTo(x,y) : s.lineTo(x,y);
+    });
+  }
+  s.closePath();
+  const g = new T3.ExtrudeGeometry(s,{depth:w,bevelEnabled:false});
+  g.translate(0,0,-w/2); return g;
+}
+function cyl(r, h, seg=24) { const g = new T3.CylinderGeometry(r,r,h,seg); g.rotateX(Math.PI/2); return g; } // 沿 z
+/* 轴：沿局部 z 从 z0 到 z1，带键条以显示转动 */
+function shaftMesh(b, r, z0, z1, parts, color=PAL.steel) {
+  const h = z1-z0, m = add(b.spin, cyl(r,h,16), color, parts, [0,0,(z0+z1)/2]);
+  const key = add(b.spin, new T3.BoxGeometry(r*.5, r*.5, h*.98), PAL.brass, parts, [r,0,(z0+z1)/2]);
+  return m;
+}
+function marker(b, r, z, parts) { return add(b.spin, new T3.SphereGeometry(2.4,10,8), PAL.red, parts, [r*.72,0,z]); }
+function spurBody(scene, id, axis, c, kk, z, rp, w, parts, color=PAL.steel, m=2.5) {
+  const b = body(scene, id, axis, c, kk);
+  add(b.spin, gearGeo(z, rp, w, m), color, parts);
+  add(b.spin, cyl(Math.min(rp*.35,14), w+8, 16), PAL.dark, parts);
+  marker(b, rp, w/2+0.5, parts); b.z = z; b.rp = rp; return b;
+}
+/* 锥齿轮：apex 在局部 z=0，向 +z 张开，大端在 z=h */
+function bevelBody(scene, id, axis, apex, kk, r, parts, dir=1, z=24) {
+  const b = body(scene, id, axis, apex, kk, dir), h = r;
+  const cone = new T3.CylinderGeometry(r*.97, 1.5, h, 36, 1, true); cone.rotateX(Math.PI/2); cone.translate(0,0,h/2);
+  const m1 = add(b.spin, cone, PAL.steel, parts); m1.material.side = T3.DoubleSide;
+  add(b.spin, gearGeo(z, r, 7, 2*r/z), PAL.steel, parts, [0,0,h-3.5]);
+  add(b.spin, cyl(9, h*.6, 14), PAL.dark, parts, [0,0,h+h*.2]);
+  marker(b, r, h-1, parts); return b;
+}
+/* 两点之间的杆(圆柱，随帧调整) */
+function rodBetween(mesh, p, q) {
+  const d = new T3.Vector3().subVectors(q,p), L = d.length();
+  mesh.position.copy(p).addScaledVector(d,.5);
+  mesh.scale.set(1, L, 1);
+  mesh.quaternion.setFromUnitVectors(new T3.Vector3(0,1,0), d.normalize());
+}
+function rod(scene, r, color, parts) {
+  const m = reg(new T3.Mesh(new T3.CylinderGeometry(r,r,1,12), mat(color)), parts, color); scene.add(m); return m;
+}
+/* 链/带环路：两圆(轴向平面坐标 u,v)，外公切线，逆时针(绕 +轴)参数化 */
+const PLANE = {X:(Y,Z)=>[Y,Z], Y:(X,Z)=>[Z,X], Z:(X,Y)=>[X,Y]};   // (u,v) 使 u×v = +轴
+function loopGeom(a, b, ra, rb) {
+  const dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy), th=Math.atan2(dy,dx), be=Math.acos((ra-rb)/L);
+  const t = Math.sqrt(L*L-(ra-rb)**2), arcA=2*Math.PI-2*be, arcB=2*be;
+  return {a,b,ra,rb,th,be,t,arcA,arcB,len:2*t+ra*arcA+rb*arcB};
+}
+function seg(c, r, n, s) { const d=n+Math.PI/2; return [c[0]+r*Math.cos(n)+s*Math.cos(d), c[1]+r*Math.sin(n)+s*Math.sin(d), d]; }
+function loopAt(g, s) {            // 返回 [u,v,切线角]
+  s = ((s%g.len)+g.len)%g.len;
+  const {a,b,ra,rb,th,be,t,arcA,arcB} = g, n1=th-be, n2=th+be;
+  if (s < t) return seg(a,ra,n1,s);
+  s -= t;
+  if (s < rb*arcB) { const q=n1+s/rb; return [b[0]+rb*Math.cos(q), b[1]+rb*Math.sin(q), q+Math.PI/2]; }
+  s -= rb*arcB;
+  if (s < t) return seg(b,rb,n2,s);
+  s -= t; const q=n2+s/ra; return [a[0]+ra*Math.cos(q), a[1]+ra*Math.sin(q), q+Math.PI/2];
+}
+
+/* 装配辅助 */
+function angleOf(b, d) {               // 世界方向 d 绕本体轴(局部+z)相对局部 x 的夹角
+  const lx = new T3.Vector3(1,0,0).applyQuaternion(b.root.quaternion);
+  const a3 = new T3.Vector3(0,0,1).applyQuaternion(b.root.quaternion);
+  const d3 = W(d[0],d[1],d[2]).normalize();
+  return Math.atan2(a3.dot(new T3.Vector3().crossVectors(lx,d3)), lx.dot(d3));
+}
+function meshPair(b1, b2, d) {         // d: 世界方向，由 b1 指向 b2；b1 齿对准啮合点，b2 齿槽对准
+  b1.phase = angleOf(b1, d);
+  b2.phase = angleOf(b2, [-d[0],-d[1],-d[2]]) - Math.PI/b2.z;
+}
+function helixWorm(b, rp, len, lead, rh, parts, zc) {
+  const pts = [], turns = len/lead, n = Math.ceil(turns*18);
+  for (let i=0;i<=n;i++) { const t=i/n*turns, a=2*Math.PI*t*(rh?1:-1);
+    pts.push(new T3.Vector3((rp+1)*Math.cos(a), (rp+1)*Math.sin(a), zc-len/2+t*lead)); }
+  add(b.spin, new T3.TubeGeometry(new T3.CatmullRomCurve3(pts), n, 3.2, 8, false), PAL.steel, parts);
+  add(b.spin, cyl(rp-1.5, len, 20), PAL.dark, parts, [0,0,zc]);
+}
+function makeLoop(scene, axis, fixed, rA, rB, pitch, w, color, parts, stripe) {
+  const g0 = loopGeom([0,0],[100,0],rA,rB);   // 仅用于估算链节数，更新时按实际中心距取链长
+  const ms = [];
+  return {init(A,B) {
+    const N = Math.max(10, Math.round(loopGeom(A,B,rA,rB).len/pitch));
+    for (let i=0;i<N;i++) {
+      const m = reg(new T3.Mesh(new T3.BoxGeometry(pitch*.82, stripe?3:4.5, w), mat(stripe&&i%2 ? PAL.dark : (i%2? PAL.dark: color))), parts, color);
+      m.matrixAutoUpdate = true; scene.add(m); ms.push(m);
+    }
+  }, update(A, B, s) {
+    const g = loopGeom(A,B,rA,rB), N = ms.length;
+    for (let i=0;i<N;i++) {
+      const [u,v,ang] = loopAt(g, s + i*g.len/N), c=Math.cos(ang), d=Math.sin(ang);
+      const Pw = axis==='X'?[fixed,u,v]: axis==='Y'?[v,fixed,u]:[u,v,fixed];
+      const Tg = axis==='X'?[0,c,d]: axis==='Y'?[d,0,c]:[c,d,0];
+      const t3 = W(...Tg).normalize(), a3 = AX[axis];
+      ms[i].position.copy(W(...Pw));
+      ms[i].quaternion.setFromRotationMatrix(new T3.Matrix4().makeBasis(t3, new T3.Vector3().crossVectors(a3,t3), a3));
+    }
+  }};
+}
+function coilMesh(r, len, turns, parts) {
+  const pts=[], n=turns*16;
+  for (let i=0;i<=n;i++){const t=i/n*turns,a=2*Math.PI*t; pts.push(new T3.Vector3(r*Math.cos(a), r*Math.sin(a), t/turns*len));}
+  return reg(new T3.Mesh(new T3.TubeGeometry(new T3.CatmullRomCurve3(pts), n, 1.4, 6, false), mat(0xc8a64a)), parts, 0xc8a64a);
+}
+
+function buildMachine(scene) {
+  const P = YJ.P, k = YJ.k, r = P.r, e = P.stroke.e, L = P.stroke.L, loops = [], frame = [], lines = [];
+  const Yc0 = P.Yc0 + P.feed.a0, d1 = 106, d2 = 130, Yp = Yc0 + 96;
+  const fr = (geo, pos, op=.2, col=0x9aa6a3) => { const m = new T3.Mesh(geo, new T3.MeshStandardMaterial({color:col, transparent:true, opacity:op, roughness:.9, depthWrite:false})); m.position.copy(W(...pos)); scene.add(m); frame.push(m); return m; };
+  fr(new T3.BoxGeometry(560,6,470), [50,130,-103], .28);                      // 底板
+  fr(new T3.BoxGeometry(24,480,170), [160,120,140], .14);                      // 立柱示意
+  [62,190].forEach(y => fr(new T3.BoxGeometry(70,70,10), [60,y,372], .3));     // 曲柄轴支承板
+  // ===== 公共传动 =====
+  const M = body(scene,'M','X',[0,P.M.Y,P.M.Z],k.M);
+  add(M.spin, cyl(r.P1,24,24), PAL.dark, '1'); shaftMesh(M,5,-10,40,'1'); marker(M,r.P1,13,'1');
+  const hous = reg(new T3.Mesh(cyl(55,170,28), mat(0x5b7a99)), '1', 0x5b7a99);
+  hous.geometry.rotateX(0); hous.quaternion.setFromUnitVectors(new T3.Vector3(0,0,1), AX.X); hous.position.copy(W(110,P.M.Y,P.M.Z)); scene.add(hous);
+  const I = body(scene,'I','X',[0,P.I.Y,P.I.Z],k.I);
+  add(I.spin, cyl(r.P2,24,40), PAL.dark, '2'); add(I.spin, cyl(r.P2-8,26,40), PAL.red, '2');
+  add(I.spin, cyl(r.F,16,32), PAL.dark, 'F', [0,0,-42]);
+  add(I.spin, gearGeo(48,r.z3,20,3), PAL.steel, '3', [0,0,-78]);
+  shaftMesh(I,9,-95,30,'3'); marker(I,r.P2,13,'2'); marker(I,r.z3,-78,'3');
+  const II = body(scene,'II','X',[-78,P.II.Y,P.II.Z],k.II); II.z = 24;
+  add(II.spin, gearGeo(24,r.z4,20,3), PAL.steel, '4'); shaftMesh(II,8,-112,30,'4'); marker(II,r.z4,10,'4');
+  meshPair(I, II, [0,-76.4,76.4]);
+  bevelBody(scene,'5a','X',[-175,P.II.Y,P.II.Z],k.II,r.b5,'5');
+  bevelBody(scene,'5b','Y',[-175,P.II.Y,P.II.Z],k.III,r.b5,'5');
+  // ===== Ⅲ轴：蜗杆7、链轮10a =====
+  const III = body(scene,'III','Y',[-175,P.II.Y,P.II.Z],k.III);
+  shaftMesh(III,8,34,236,'6'); helixWorm(III,r.worm7,60,7.85,true,'7',120);
+  add(III.spin, gearGeo(18,r.S10a,10,4), PAL.steel, '10', [0,0,220.4]); marker(III,r.S10a,220.4,'10');
+  // ===== W轴：蜗轮、锥齿轮8b =====
+  const Wb = body(scene,'W','Z',[P.W.X,P.W.Y,0],k.W);
+  add(Wb.spin, gearGeo(20,r.ww,14,2.5), PAL.brass, '7w', [0,0,70.4]); shaftMesh(Wb,7,20,215,'7w'); marker(Wb,r.ww,70.4,'7w');
+  bevelBody(scene,'8b','Z',[P.W.X,P.W.Y,210],k.W,r.b8,'8',-1);
+  // ===== Ⅳ轴：锥齿轮8a、挂轮9a、链轮19a =====
+  bevelBody(scene,'8a','X',[P.W.X,P.IV.Y,210],k.IV,r.b8,'8');
+  const IV = body(scene,'IV','X',[P.W.X,P.IV.Y,P.IV.Z],k.IV); IV.z = 75;
+  shaftMesh(IV,8,30,436,'9'); add(IV.spin, gearGeo(75,r.z9a,36,2.5), PAL.steel, '9', [0,0,95]); marker(IV,r.z9a,95,'9');
+  add(IV.spin, gearGeo(25,r.S19a,10,4), PAL.steel, '19', [0,0,385]); marker(IV,r.S19a,385,'19');
+  // ===== Ⅵ轴：挂轮9b、链轮11a =====
+  const VI = body(scene,'VI','X',[-40,P.VI.Y,P.VI.Z],k.VI); VI.z = 45;
+  add(VI.spin, gearGeo(45,r.z9b,18,2.5), PAL.steel, '9'); shaftMesh(VI,8,-20,182,'9');
+  add(VI.spin, gearGeo(12,r.S11,10,4), PAL.steel, '11', [0,0,170]); marker(VI,r.z9b,0,'9');
+  meshPair(IV, VI, [0,0,-150]);
+  // ===== 随刀架上下往复的部分(rc) =====
+  const rc = new T3.Group(); scene.add(rc);
+  const bx = new T3.Mesh(new T3.BoxGeometry(90,80,110), new T3.MeshStandardMaterial({color:0x8aa595, transparent:true, opacity:.28, roughness:.8, depthWrite:false}));
+  bx.position.copy(W(60,95,130)); bx.userData.parts=['13']; bx.userData.base=0x8aa595; bx.userData.op=.28; rc.add(bx); meshes.push(bx);
+  const eg = new T3.LineSegments(new T3.EdgesGeometry(bx.geometry), new T3.LineBasicMaterial({color:0x3d5a4a})); eg.position.copy(bx.position); eg.userData.parts=['13']; eg.userData.base=0x3d5a4a; rc.add(eg); lines.push(eg);
+  const VII = body(rc,'VII','X',[0,P.VII.Y,P.VII.Z],k.VII);
+  helixWorm(VII,r.worm11,60,7.85,true,'11',60); shaftMesh(VII,8,10,150,'11');
+  add(VII.spin, gearGeo(12,r.S11,10,4), PAL.steel, '11', [0,0,130]); marker(VII,r.S11,130,'11');
+  const SP = body(rc,'SP','Z',[P.S.X,P.S.Y,0],k.SP); SP.z = 20;
+  shaftMesh(SP,11,-35,240,'14'); add(SP.spin, gearGeo(20,r.sp,14,2.5), PAL.brass, '11', [0,0,130]);
+  add(SP.spin, gearGeo(20,r.cutter,10,2.5), PAL.red, '14', [0,0,-20]); marker(SP,r.sp,130,'11'); marker(SP,r.cutter,-20,'14');
+  const joint = add(rc, cyl(7,26,14), PAL.brass, '12', [0,0,0]); joint.position.copy(W(60,109.6,230)); joint.quaternion.setFromUnitVectors(new T3.Vector3(0,0,1), AX.Y);
+  // ===== 曲柄轴、连杆 =====
+  const C = body(scene,'C','Y',[P.C.X,0,P.C.Z],k.C);
+  shaftMesh(C,9,60,190,'12'); add(C.spin, cyl(24,12,32), PAL.red, '12', [0,0,109.6]);
+  C.pin = add(C.spin, cyl(5,22,12), PAL.brass, '12', [e,0,109.6]);
+  add(C.spin, gearGeo(18,r.S10b,10,4), PAL.steel, '10', [0,0,170]); marker(C,r.S10b,170,'10');
+  C.phase = angleOf(C,[0,0,1]);
+  const conRod = rod(scene, 6, PAL.dark, '12');
+  // ===== 伸缩轴T、曲柄21 =====
+  const T = body(scene,'T','X',[0,P.T.Y,P.T.Z],k.T);
+  shaftMesh(T,8,100,262,'21'); add(T.spin, cyl(10,8,20), PAL.red, '21', [0,0,124]);
+  T.pin = add(T.spin, cyl(3,22,10), PAL.brass, '21', [P.feed.e,0,124]);
+  add(T.spin, gearGeo(15,r.S19b,10,4), PAL.steel, '19', [0,0,250]); marker(T,r.S19b,250,'19');
+  T.phase = angleOf(T,[0,1,0]);
+  // ===== 滑板组 cg：工作台+蜗杆22 =====
+  const cg = new T3.Group(); scene.add(cg);
+  const pl = new T3.Mesh(new T3.BoxGeometry(170,27,160), new T3.MeshStandardMaterial({color:0x9db8a4, transparent:true, opacity:.5, roughness:.8}));
+  pl.position.copy(W(60,Yc0+10,-81.5)); pl.userData.parts=['C']; pl.userData.base=0x9db8a4; pl.userData.op=.5; cg.add(pl); meshes.push(pl);
+  const WK = body(cg,'WK','Z',[P.cx,Yc0,0],k.table); WK.z = 40;
+  add(WK.spin, gearGeo(40,r.tw,14,2.5), PAL.brass, '22', [0,0,-55]);
+  add(WK.spin, cyl(60,10,40), PAL.dark, '15', [0,0,-43]);
+  add(WK.spin, gearGeo(40,r.work,20,2.5), PAL.blank, '15', [0,0,-28]); shaftMesh(WK,8,-68,-6,'15'); marker(WK,r.work,-17,'15');
+  const W22 = body(cg,'W22','X',[0,Yc0+65,P.T.Z],k.T);
+  helixWorm(W22,r.worm22,70,7.85,YJ.k.sign22>0,'22',57.5); shaftMesh(W22,7,10,102,'22');
+  meshPair(SP, WK, [0,1,0]); 
+  const joint2 = rod(cg, 5, PAL.brass, '21');
+  // ===== 推杆机构：立柱17、摇杆18、滚子16、连杆20、弹簧23 =====
+  const post = reg(new T3.Mesh(cyl(6,44,14), mat(PAL.dark)), '17', PAL.dark); post.quaternion.setFromUnitVectors(new T3.Vector3(0,0,1), AX.Z); post.position.copy(W(230,Yp,-82)); scene.add(post);
+  const arm = new T3.Group(); arm.position.copy(W(230,Yp,-82)); scene.add(arm);
+  add(arm, new T3.BoxGeometry(140,8,10), PAL.green, '18', [-65,0,0]);
+  add(arm, new T3.CylinderGeometry(6,6,12,16), PAL.red, '16', [-132,0,0]);
+  const link = rod(scene, 3, PAL.steel, '20');
+  const sp = coilMesh(8, 40, 7, '23'); sp.rotation.y = Math.PI; sp.position.copy(W(130,76.6,-82)); scene.add(sp);
+  const spPost = reg(new T3.Mesh(new T3.BoxGeometry(12,36,24), mat(PAL.dark)), '23', PAL.dark); spPost.position.copy(W(130,70,-82)); scene.add(spPost);
+  // ===== 链与带 =====
+  const belt = makeLoop(scene,'X',0,r.P1,r.P2,12,20,0x2b3138,'2',true);
+  const ch10 = makeLoop(scene,'Y',170,r.S10a,r.S10b,12.57,10,PAL.chain,'10');
+  const ch11 = makeLoop(scene,'X',130,r.S11,r.S11,12.57,10,PAL.chain,'11');
+  const ch19 = makeLoop(scene,'X',250,r.S19a,r.S19b,12.57,10,PAL.chain,'19');
+  const A10=[P.II.Z,-175], B10=[P.C.Z,P.C.X];
+  belt.init([P.M.Y,P.M.Z],[P.I.Y,P.I.Z]); ch10.init(A10,B10);
+  ch11.init([P.VI.Y,P.VI.Z],[P.VII.Y,P.VII.Z]); ch19.init([P.IV.Y,P.IV.Z],[P.T.Y,P.T.Z]);
+  const v1 = new T3.Vector3();
+  function update(phi) {
+    bodies.forEach(b => { b.spin.rotation.z = b.phase + b.dir*b.k*phi; });
+    const fc = k.C*phi, zs = P.C.Z + e*Math.cos(fc) - Math.sqrt(L*L-(e*Math.sin(fc))**2), dz = zs - P.stroke.Zrod0;
+    rc.position.y = dz;
+    const dpin = P.feed.e*Math.cos(k.T*phi), dY = dpin*d2/d1, dlt = -dpin/d1;
+    cg.position.z = -dY;
+    arm.rotation.y = dlt;
+    scene.updateMatrixWorld(true);
+    C.pin.getWorldPosition(v1);
+    rodBetween(conRod, v1, W(60,109.6,230+dz));
+    T.pin.getWorldPosition(v1);
+    rodBetween(link, v1, W(230-d1*Math.cos(dlt), Yp-d1*Math.sin(dlt), -82));
+    rodBetween(joint2, W(100,P.T.Y,P.T.Z), W(102,Yc0+65+dY,P.T.Z));
+    sp.scale.z = (Yc0-70+dY-76.6)/40;
+    belt.update([P.M.Y,P.M.Z],[P.I.Y,P.I.Z], r.P1*k.M*phi);
+    ch10.update(A10,B10, r.S10a*k.III*phi);
+    ch11.update([P.VI.Y,P.VI.Z],[P.VII.Y,P.VII.Z+dz], r.S11*k.VI*phi);
+    ch19.update([P.IV.Y,P.IV.Z],[P.T.Y,P.T.Z], r.S19a*k.IV*phi);
+    return {dz, a: P.feed.a0 + dY};
+  }
+  const anchors = {'1':[110,176,-100],'2':[0,26,62],'F':[-42,26,32],'3':[-78,26,70],'4':[-78,-50.4,108],'5':[-150,-50.4,95],
+    '6':[-175,0,88],'7':[-175,69.6,90],'7w':[-135,69.6,98],'8':[-120,69.6,226],'9':[-40,69.6,310],'10':[-60,170,225],'11':[130,69.6,160],
+    '12':[60,109.6,408],'13':[60,95,178],'14':[60,109.6,-48],'15':[60,Yc0,-6],'16':[100,Yp,-70],'17':[230,Yp,-56],'18':[170,Yp,-72],
+    '19':[250,160,100],'20':[124,265,-66],'21':[190,260,-40],'22':[57,Yc0+65,-44],'23':[130,98,-70],'C':[-10,Yc0,-70]};
+  return {update, frame, lines, anchors};
+}
+
+/* 国标机构运动简图（GB/T 4460）：由 YJ.P 的布局常量按正投影生成，与 3D 模型一一对应 */
+const DWG = (() => {
+  const P = YJ.P, k = YJ.k, r = P.r, Yc0 = P.Yc0 + P.feed.a0;
+  const f = n => (Math.round(n*10)/10);
+  const VIEW = {
+    front:{P:(s,ox,oy)=>(X,Y,Z)=>[ox+s*X, oy-s*Z], dir:{X:[1,0],Y:null,Z:[0,-1]}, sv:{Y:-1}},
+    top:  {P:(s,ox,oy)=>(X,Y,Z)=>[ox+s*X, oy-s*Y], dir:{X:[1,0],Y:[0,-1],Z:null}, sv:{Z:1}},
+    left: {P:(s,ox,oy)=>(X,Y,Z)=>[ox+s*Y, oy-s*Z], dir:{X:null,Y:[1,0],Z:[0,-1]}, sv:{X:1}},
+  };
+  const SECOL = {pub:'var(--pub)', gen:'var(--gen)', cut:'var(--cut)', feed:'var(--feed)'};
+  function V(type, s, ox, oy, col) {
+    const vw = VIEW[type], p = vw.P(s,ox,oy), o = [];
+    const A = (...x) => p(...x);
+    const push = x => o.push(x);
+    const ln = (a,b,c='t',ex='') => { const [x1,y1]=a,[x2,y2]=b; push(`<line class="${c}" x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" ${ex}/>`); };
+    const txt = (x,y,t,c='tx',anc='middle') => push(`<text class="${c}" x="${f(x)}" y="${f(y)}" text-anchor="${anc}">${t}</text>`);
+    const dirOf = ax => vw.dir[ax];
+    const perp = d => [-d[1], d[0]];
+    const api = {p, s, o, push, ln, txt};
+    // 轴(在图面内)：粗实线 + 两端向心轴承符号
+    api.shaft = (a, b, ax, noB) => { const pa=A(...a), pb=A(...b), d=dirOf(ax); ln(pa,pb,'sh');
+      if (!noB && d) { const n=perp(d); [pa,pb].forEach(q => ln([q[0]-n[0]*7,q[1]-n[1]*7],[q[0]+n[0]*7,q[1]+n[1]*7],'t')); } };
+    api.end = c => { const q=A(...c); push(`<circle class="sh0" cx="${f(q[0])}" cy="${f(q[1])}" r="4"/><circle class="dot" cx="${f(q[0])}" cy="${f(q[1])}" r="1.3"/>`); };
+    api.cl = (a,b) => ln(A(...a),A(...b),'cl');
+    // 圆柱齿轮/带轮/链轮：轴在图面内 → 垂直于轴的细长矩形；轴垂直图面 → 节圆
+    api.gear = (ax, c, rm, kind='g', z) => { const q=A(...c), d=dirOf(ax), R=rm*s;
+      if (!d) { push(`<circle class="${kind==='g'?'cl':'t'}" cx="${f(q[0])}" cy="${f(q[1])}" r="${f(R)}"/>`); if (z) txt(q[0],q[1]+R+11,'z='+z,'tx s'); return; }
+      const n=perp(d), w=kind==='b'?9:6, ang=Math.atan2(d[1],d[0])*180/Math.PI;
+      push(`<g transform="translate(${f(q[0])} ${f(q[1])}) rotate(${f(ang)})"><rect class="t" x="${-w/2}" y="${f(-R)}" width="${w}" height="${f(2*R)}"/>${kind==='c'?`<path class="t" d="M${-w/2} ${f(-R)}v${f(2*R)}" stroke-dasharray="2 2"/>`:''}${kind==='b'?`<path class="t" d="M-2.5 ${f(-R)}l2.5 5l2.5 -5M-2.5 ${f(R)}l2.5 -5l2.5 5"/>`:''}</g>`);
+      if (z) txt(q[0]+n[0]*(R+12)+(d[0]?0:0), q[1]+n[1]*(R+12)+4, 'z='+z, 'tx s'); };
+    // 锥齿轮：顶点 apex，向 axis 方向(dirSign=±1)伸出 h=半径(等径)
+    api.bevel = (ax, apex, rm, sign=1) => { const d=dirOf(ax), R=rm*s;
+      if (!d) { const q=A(...apex); push(`<circle class="t" cx="${f(q[0])}" cy="${f(q[1])}" r="${f(R)}" stroke-dasharray="4 2"/>`); return; }
+      const a=A(...apex), n=perp(d), b=[a[0]+d[0]*R*sign, a[1]+d[1]*R*sign];
+      push(`<path class="t" d="M${f(a[0])} ${f(a[1])}L${f(b[0]+n[0]*R)} ${f(b[1]+n[1]*R)}L${f(b[0]-n[0]*R)} ${f(b[1]-n[1]*R)}Z"/>`);
+      ln([b[0]+n[0]*R,b[1]+n[1]*R],[b[0]-n[0]*R,b[1]-n[1]*R],'t'); };
+    // 蜗杆(轴在图面内：矩形+斜线；垂直图面：圆内加螺旋示意)
+    api.worm = (ax, c, len, rm) => { const q=A(...c), d=dirOf(ax), R=rm*s;
+      if (!d) { push(`<circle class="t" cx="${f(q[0])}" cy="${f(q[1])}" r="${f(R)}"/><circle class="t" cx="${f(q[0])}" cy="${f(q[1])}" r="${f(R*.45)}"/><path class="t" d="M${f(q[0]-R)} ${f(q[1])}a${f(R)} ${f(R)} 0 0 1 ${f(R)} ${f(-R)}" />`); return; }
+      const L=len*s, ang=Math.atan2(d[1],d[0])*180/Math.PI, n=4;
+      let sl=''; for (let i=1;i<n;i++) sl+=`<line class="t" x1="${f(-L/2+L*i/n-3)}" y1="${f(R)}" x2="${f(-L/2+L*i/n+3)}" y2="${f(-R)}"/>`;
+      push(`<g transform="translate(${f(q[0])} ${f(q[1])}) rotate(${f(ang)})"><rect class="t" x="${f(-L/2)}" y="${f(-R)}" width="${f(L)}" height="${f(2*R)}"/>${sl}</g>`); };
+    // 外公切线(真形)：链(点划线)/带(实线)；(u,v)=屏幕坐标
+    api.loop = (c1, r1, c2, r2, kind) => { const a=A(...c1), b=A(...c2), R1=r1*s, R2=r2*s, dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy), th=Math.atan2(dy,dx), be=Math.acos((R1-R2)/L);
+      [th-be, th+be].forEach(n => { const p1=[a[0]+R1*Math.cos(n), a[1]+R1*Math.sin(n)], p2=[b[0]+R2*Math.cos(n), b[1]+R2*Math.sin(n)]; ln(p1,p2, kind==='belt'?'t':'ch'); }); };
+    // 边视链/带：两端矩形之间的两条线
+    api.edgeLoop = (c1, rA, c2, rB, ax, kind) => { const a=A(...c1), b=A(...c2), dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy)||1, u=[dx/L,dy/L], n=[-u[1],u[0]], ra=rA*s, rb=rB*s;
+      const pa=[a[0]+u[0]*ra, a[1]+u[1]*ra], pb=[b[0]-u[0]*rb, b[1]-u[1]*rb];
+      [-3.5,3.5].forEach(e => ln([pa[0]+n[0]*e,pa[1]+n[1]*e],[pb[0]+n[0]*e,pb[1]+n[1]*e], kind==='belt'?'t':'ch')); };
+    api.rot = (c, ax, kk, R=16) => { const q=A(...c), sense = Math.sign(kk)*(vw.sv[ax]||0); if (!sense) return;   // +1：屏幕上逆时针
+      const pt = th => [q[0]+R*Math.cos(th), q[1]-R*Math.sin(th)], ths=-0.35*Math.PI, the=1.2*Math.PI, ps=pt(ths), pe=pt(the);
+      push(`<path class="ar" d="M${f(ps[0])} ${f(ps[1])}A${R} ${R} 0 1 0 ${f(pe[0])} ${f(pe[1])}"/>`);
+      const th = sense>0 ? the : ths, P0 = pt(th), t = sense>0 ? [-Math.sin(th),-Math.cos(th)] : [Math.sin(th),Math.cos(th)], n=[-t[1],t[0]];
+      const tip=[P0[0]+t[0]*5, P0[1]+t[1]*5], b1=[P0[0]-t[0]*2+n[0]*4, P0[1]-t[1]*2+n[1]*4], b2=[P0[0]-t[0]*2-n[0]*4, P0[1]-t[1]*2-n[1]*4];
+      push(`<path class="arh" d="M${f(tip[0])} ${f(tip[1])}L${f(b1[0])} ${f(b1[1])}L${f(b2[0])} ${f(b2[1])}Z"/>`); };
+    api.num = (c, dx, dy, id) => { const q=A(...c), x=q[0]+dx, y=q[1]+dy; ln(q,[x,y],'lead'); push(`<circle class="nb" cx="${f(x)}" cy="${f(y)}" r="9.5"/><text class="nt" x="${f(x)}" y="${f(y+3.6)}" text-anchor="middle">${id}</text>`); };
+    api.name = (c, dx, dy, t, anc='start') => { const q=A(...c); txt(q[0]+dx, q[1]+dy, t, 'tx', anc); };
+    api.hatch = (c, ang=0, len=16) => { const q=A(...c); let h=''; for (let i=-2;i<=2;i++) h+=`<line class="t" x1="${f(i*4-3)}" y1="0" x2="${f(i*4-8)}" y2="7"/>`; push(`<g transform="translate(${f(q[0])} ${f(q[1])}) rotate(${ang})"><line class="t" x1="-12" y1="0" x2="12" y2="0"/>${h}</g>`); };
+    api.rect = (c1, c2, c='t', ex='') => { const a=A(...c1), b=A(...c2); push(`<rect class="${c}" x="${f(Math.min(a[0],b[0]))}" y="${f(Math.min(a[1],b[1]))}" width="${f(Math.abs(b[0]-a[0]))}" height="${f(Math.abs(b[1]-a[1]))}" ${ex}/>`); };
+    api.html = () => o.join('');
+    return api;
+  }
+  const rotText = (kk, ax, vs) => `${kk>0?'↺':'↻'}`;
+  // 各部分图形 ------------------------------------------------------------------
+  function pub() {                                    // 左视图(沿 −X 方向看，右=+Y，上=+Z)
+    const v = V('left', 1.25, 170, 210);
+    // Ⅰ轴(∥X，端视)：带轮2、飞轮F、齿轮3
+    v.gear('X',[0,P.I.Y,P.I.Z], r.P2,'b'); v.gear('X',[0,P.I.Y,P.I.Z], r.F,'b'); v.gear('X',[0,P.I.Y,P.I.Z], r.z3,'g',P.z.z3); v.end([0,P.I.Y,P.I.Z]);
+    v.gear('X',[0,P.II.Y,P.II.Z], r.z4,'g',P.z.z4); v.end([0,P.II.Y,P.II.Z]);
+    v.gear('X',[0,P.M.Y,P.M.Z], r.P1,'b'); v.end([0,P.M.Y,P.M.Z]);
+    v.loop([0,P.M.Y,P.M.Z], r.P1, [0,P.I.Y,P.I.Z], r.P2, 'belt');
+    // 电动机 1：圆 + M
+    const m = v.p(0,P.M.Y,P.M.Z); v.push(`<circle class="t" cx="${f(m[0])}" cy="${f(m[1])}" r="${f(r.P1*1.25*2.2)}" stroke-dasharray="7 3"/><text class="tx" x="${f(m[0]+38)}" y="${f(m[1]+48)}" text-anchor="middle">M</text>`);
+    // 锥齿轮副 5：5a 与Ⅱ轴同心(端视)，5b 在Ⅲ轴(∥Y)上
+    v.bevel('X',[P.III.X,P.II.Y,P.II.Z], r.b5);
+    v.bevel('Y',[P.III.X,P.II.Y,P.II.Z], r.b5, 1);
+    v.shaft([P.III.X,P.II.Y,P.II.Z],[P.III.X,P.II.Y+170,P.II.Z],'Y');
+    v.rot([0,P.I.Y,P.I.Z],'X',k.I,12); v.rot([0,P.II.Y,P.II.Z],'X',k.II,12); v.rot([0,P.M.Y,P.M.Z],'X',k.M,12);
+    v.num([0,P.M.Y+22,P.M.Z-30],-0,0,'');  
+    v.num([0,P.M.Y,P.M.Z], 62,-40,'1'); v.num([0,P.I.Y+r.P2*.7,P.I.Z-r.P2*.7], 26,28,'2'); v.num([0,P.I.Y+r.F,P.I.Z], 46,60,'F');
+    v.num([0,P.I.Y-r.z3*.7,P.I.Z-r.z3*.7], -30,24,'3'); v.num([0,P.II.Y-r.z4*.7,P.II.Z+r.z4*.7], -34,-12,'4');
+    v.num([P.III.X,P.II.Y+30,P.II.Z], 0,-34,'5');
+    v.name([0,P.II.Y+60,P.II.Z], 40,-44,'Ⅲ轴 →(去切削、范成、进给)');
+    v.name([0,P.II.Y,P.II.Z-r.z4], -54,-6,'Ⅱ轴','end'); v.name([0,P.I.Y,P.I.Z-r.z3], 8,22,'Ⅰ轴'); v.name([0,P.M.Y,P.M.Z-30], 52,36,'电机轴');
+    return {w:520,h:500,body:v.html(),cap:'左视图(沿Ⅰ、Ⅱ轴方向看，Y向右、Z向上)：电动机→V带→Ⅰ轴(带轮2、飞轮F、齿轮3)→齿轮4→Ⅱ轴→锥齿轮副5→Ⅲ轴。'};
+  }
+  return {pub, V, VIEW, SECOL, f};
+})();
+
+/* 切削 / 范成 / 进给 三张简图 */
+(() => {
+  const P = YJ.P, k = YJ.k, r = P.r, e = P.stroke.e, V = DWG.V, f = DWG.f;
+  const Yc = P.Yc0 + P.feed.a0;
+  const zig = (v, c1, c2, n=7, amp=6) => {       // 弹簧符号(沿 Y 方向)
+    const a=v.p(...c1), b=v.p(...c2), L=Math.hypot(b[0]-a[0],b[1]-a[1]), u=[(b[0]-a[0])/L,(b[1]-a[1])/L], nn=[-u[1],u[0]];
+    let pts=[a]; for (let i=0;i<n;i++){ const t=(i+.5)/n, sg=i%2?1:-1; pts.push([a[0]+u[0]*L*t+nn[0]*amp*sg, a[1]+u[1]*L*t+nn[1]*amp*sg]); } pts.push(b);
+    v.push(`<polyline class="t" points="${pts.map(q=>f(q[0])+','+f(q[1])).join(' ')}"/>`); };
+  const dbl = (v, c1, c2) => { const a=v.p(...c1), b=v.p(...c2), L=Math.hypot(b[0]-a[0],b[1]-a[1]), u=[(b[0]-a[0])/L,(b[1]-a[1])/L], n=[-u[1],u[0]];
+    v.ln(a,b,'ar'); [[a,1],[b,-1]].forEach(([q,sg]) => v.push(`<path class="arh" d="M${f(q[0]-sg*u[0]*5)} ${f(q[1]-sg*u[1]*5)}L${f(q[0]+sg*u[0]*3+n[0]*4)} ${f(q[1]+sg*u[1]*3+n[1]*4)}L${f(q[0]+sg*u[0]*3-n[0]*4)} ${f(q[1]+sg*u[1]*3-n[1]*4)}Z"/>`)); };
+  const brk = (v, c) => { const q=v.p(...c); v.push(`<path class="t" d="M${f(q[0]-6)} ${f(q[1]-5)}l12 10M${f(q[0]-6)} ${f(q[1]+1)}l12 10"/>`); };
+  // 上游(Ⅱ轴→锥齿轮5→Ⅲ轴→蜗杆7→蜗轮→锥齿轮8)在主视图的画法
+  function upstreamFront(v) {
+    const A5=[P.III.X,0,P.II.Z];
+    v.shaft([-195,0,P.II.Z],[-110,0,P.II.Z],'X'); v.bevel('X',A5,r.b5,1); v.bevel('Y',A5,r.b5,1);
+    v.worm('Y',[P.III.X,0,P.II.Z],60,r.worm7); v.gear('Y',[P.III.X,0,P.II.Z],r.S10a,'c');
+    v.gear('Z',[P.W.X,0,P.II.Z],r.ww,'g',P.z.z7w); v.shaft([P.W.X,0,20],[P.W.X,0,214],'Z');
+    v.bevel('Z',[P.W.X,0,210],r.b8,-1); v.bevel('X',[P.W.X,0,210],r.b8,1);
+  }
+  DWG.cut = function() {                      // 主视图(沿 +Y 看，右=+X，上=+Z)：曲柄滑块和链传动均在此平面内，反映真形
+    const v = V('front', .95, 250, 410), A5=[P.III.X,0,P.II.Z], C=[P.C.X,0,P.C.Z];
+    v.shaft([-200,0,P.II.Z],[-120,0,P.II.Z],'X'); v.bevel('X',A5,r.b5,1); v.bevel('Y',A5,r.b5,1);
+    v.worm('Y',[P.III.X,0,P.II.Z],60,r.worm7);
+    v.gear('Y',[P.III.X,0,P.II.Z],r.S10a,'c',18); v.end([P.III.X,0,P.II.Z]); v.gear('Y',C,r.S10b,'c',18); v.end(C);
+    v.loop([P.III.X,0,P.II.Z],r.S10a,C,r.S10b,'chain');
+    // 曲柄 12(图示 φ=30°)：曲柄销 B，连杆长 L，滑块(刀架箱体13+刀轴)沿 Z 向导轨移动
+    const ph=Math.PI/6, B=[C[0]+e*Math.sin(ph)*1, 0, C[2]+e*Math.cos(ph)], zs=C[2]+e*Math.cos(ph)-Math.sqrt(P.stroke.L**2-(e*Math.sin(ph))**2), S=[P.S.X,0,zs];
+    v.ln(v.p(...C),v.p(...B),'sh'); v.push(`<circle class="sh0" cx="${f(v.p(...B)[0])}" cy="${f(v.p(...B)[1])}" r="3.4"/>`);
+    v.ln(v.p(...B),v.p(...S),'sh');
+    v.shaft([P.S.X,0,-35],[P.S.X,0,zs],'Z',true); 
+    v.rect([15,0,170],[105,0,90],'t'); [[8,2],[112,-2]].forEach(([x])=>{ v.ln(v.p(x,0,60),v.p(x,0,200),'t'); });
+    v.gear('Z',[P.S.X,0,P.cutterZ0],r.cutter,'g',P.z.zc);
+    v.gear('Z',[P.S.X,0,130],r.sp,'g'); 
+    dbl(v,[150,0,100],[150,0,170]);
+    v.name([150,0,135],8,4,'行程 2e='+(2*e)+' mm','start');
+    v.hatch(v.p(0,0,0)&&[8,0,56]); v.hatch([112,0,56]);
+    ['5',].forEach(()=>0);
+    v.num([P.III.X+20,0,P.II.Z],-6,-36,'5'); v.num([P.III.X,0,P.II.Z],-40,-26,'6'); v.num([P.III.X-8,0,P.II.Z+8],-34,22,'7');
+    v.num([P.III.X-20,0,P.II.Z+30],-24,-30,'10'); v.num(C,40,-30,'12'); v.num([105,0,150],38,-34,'13'); v.num([P.S.X,0,P.cutterZ0],64,40,'14');
+    v.rot([P.III.X,0,P.II.Z],'Y',k.III,13); v.rot(C,'Y',k.C,16);
+    v.name([P.III.X-8,0,P.II.Z],8,70,'Ⅲ轴(∥Y，端视)','middle'); v.name(C,-70,-14,'曲柄轴(∥Y)','middle');
+    v.name([-200,0,P.II.Z],0,-52,'Ⅱ轴 ← 公共传动','start');
+    return {w:520,h:500,body:v.html(),cap:'主视图(沿Ⅲ轴方向看，X向右、Z向上)：Ⅲ轴→链传动10→曲柄轴→曲柄12→连杆→刀架箱体13(含刀轴、插齿刀14)沿导轨上下往复。'};
+  };
+  DWG.gen = function() {
+    const f1 = V('front', .88, 255, 330);
+    upstreamFront(f1);
+    f1.shaft([-105,0,210],[300,0,210],'X'); f1.gear('X',[-40,0,210],r.z9a,'g',P.z.z9a); f1.gear('X',[-40,0,60],r.z9b,'g',P.z.z9b);
+    f1.shaft([-60,0,60],[140,0,60],'X'); f1.gear('X',[130,0,60],r.S11,'c',12); f1.shaft([10,0,130],[150,0,130],'X'); f1.gear('X',[130,0,130],r.S11,'c',12);
+    f1.edgeLoop([130,0,60],r.S11,[130,0,130],r.S11,'X','chain'); f1.worm('X',[60,0,130],60,r.worm11);
+    f1.shaft([60,0,-35],[60,0,240],'Z',true); f1.gear('Z',[60,0,130],r.sp,'g',P.z.zsp); f1.gear('Z',[60,0,P.cutterZ0],r.cutter,'g',P.z.zc);
+    f1.gear('X',[250,0,210],r.S19a,'c',25); f1.gear('X',[250,0,-55],r.S19b,'c',15); f1.edgeLoop([250,0,210],r.S19a,[250,0,-55],r.S19b,'X','chain');
+    f1.shaft([100,0,-55],[262,0,-55],'X'); f1.worm('X',[57,0,-55],70,r.worm22); f1.shaft([10,0,-55],[102,0,-55],'X');
+    [['5',[P.III.X+20,0,P.II.Z],-8,-34],['6',[P.III.X,0,P.II.Z],-40,-24],['7',[P.III.X-6,0,P.II.Z+8],-36,26],['7w',[P.W.X+20,0,P.II.Z],18,34],['8',[P.W.X+20,0,190],38,-34],
+     ['9',[-40,0,150],38,0],['11',[60,0,130],26,-38],['11',[130,0,95],30,18],['14',[60,0,P.cutterZ0],40,40],['19',[250,0,80],34,-4],['21',[170,0,-55],0,-30],['22',[57,0,-55],0,-34]]
+     .forEach(a => f1.num(a[1],a[2],a[3],a[0]));
+    f1.rot([P.III.X,0,P.II.Z],'Y',k.III,13); f1.rot([60,0,P.cutterZ0-0],'Y',0);
+    f1.name([-40,0,100],0,0,'','middle');
+    f1.name([-215,0,300],0,0,'主视图(沿+Y看)','start');
+    // 俯视图：范成链(工作台一支)与刀、坯的啮合(图示为切入全深 a=zc/2+zw/2 ·m 状态)
+    const Yd = P.Yc0 + (r.cutter + r.work), YT = Yd + 65, t = V('top', .88, 255, 770);
+    t.shaft([210,P.IV.Y,0],[300,P.IV.Y,0],'X'); brk(t,[205,P.IV.Y,0]);
+    t.gear('X',[250,P.IV.Y,0],r.S19a,'c',25); t.gear('X',[250,YT,0],r.S19b,'c',15); t.edgeLoop([250,P.IV.Y,0],r.S19a,[250,YT,0],r.S19b,'X','chain');
+    t.shaft([100,YT,0],[262,YT,0],'X'); t.shaft([10,YT,0],[102,YT,0],'X'); t.worm('X',[57,YT,0],70,r.worm22);
+    t.gear('Z',[60,P.Yc0,0],r.cutter,'g',P.z.zc); t.end([60,P.Yc0,0]); t.gear('Z',[60,Yd,0],r.work,'g',P.z.zw); t.gear('Z',[60,Yd,0],r.tw,'g'); t.end([60,Yd,0]);
+    t.worm('X',[60,P.VII.Y,0],60,r.worm11); t.shaft([10,P.VII.Y,0],[150,P.VII.Y,0],'X'); t.gear('X',[130,P.VII.Y,0],r.S11,'c',12);
+    t.rot([60,P.Yc0,0],'Z',k.SP,18); t.rot([60,Yd,0],'Z',k.table,22);
+    [['14',[60,P.Yc0,0],-36,-44],['15',[60,Yd,0],62,-30],['22',[57,YT,0],-4,36],['21',[180,YT,0],0,-32],['19',[250,(P.IV.Y+YT)/2,0],34,0],['11',[60,P.VII.Y,0],-4,30]]
+     .forEach(a => t.num(a[1],a[2],a[3],a[0]));
+    t.name([-215,P.IV.Y+120,0],0,0,'俯视图(沿−Z看)：工作台一支','start');
+    t.name([60,P.Yc0-r.cutter,0],-40,60,'n刀 : n坯 = zw : zc = '+P.z.zw+' : '+P.z.zc,'middle');
+    const sep = `<line class="cl" x1="20" y1="425" x2="580" y2="425"/>`;
+    return {w:600,h:820,body:f1.html()+sep+t.html(),cap:'上：主视图——Ⅲ轴→蜗杆7→蜗轮→锥齿轮8→Ⅳ轴→挂轮9→链11→箱内蜗杆11→刀轴(刀14)；下：俯视图——Ⅳ轴→链19→伸缩轴21→蜗杆22→工作台蜗轮(轮坯15)，刀、坯按传动比范成啮合。'};
+  };
+  DWG.feed = function() {
+    const v = V('top', .88, 255, 380), Yp = Yc + 96, d1 = 106, d2 = 130, YT = P.T.Y;
+    v.shaft([-195,P.II.Y,0],[-110,P.II.Y,0],'X'); v.bevel('X',[P.III.X,P.II.Y,0],r.b5,1); v.bevel('Y',[P.III.X,P.II.Y,0],r.b5,1);
+    v.shaft([P.III.X,P.II.Y,0],[P.III.X,185,0],'Y'); v.worm('Y',[P.III.X,P.IV.Y,0],60,r.worm7); v.gear('Z',[P.W.X,P.IV.Y,0],r.ww,'g',P.z.z7w);
+    v.bevel('Z',[P.W.X,P.IV.Y,0],r.b8,-1); v.bevel('X',[P.W.X,P.IV.Y,0],r.b8,1); v.shaft([-105,P.IV.Y,0],[-20,P.IV.Y,0],'X'); brk(v,[-12,P.IV.Y,0]);
+    v.shaft([200,P.IV.Y,0],[300,P.IV.Y,0],'X'); brk(v,[192,P.IV.Y,0]);
+    v.gear('X',[250,P.IV.Y,0],r.S19a,'c',25); v.gear('X',[250,YT,0],r.S19b,'c',15); v.edgeLoop([250,P.IV.Y,0],r.S19a,[250,YT,0],r.S19b,'X','chain');
+    v.shaft([100,YT,0],[262,YT,0],'X'); v.shaft([10,Yc+65,0],[102,Yc+65,0],'X'); v.worm('X',[57,Yc+65,0],70,r.worm22);
+    // 曲柄21(在T轴上)、连杆20、摇杆18(绕立柱17)、滚子16
+    const cx = 124, pin=[cx,YT+P.feed.e,0], arm=[cx,Yp,0], piv=[230,Yp,0], roll=[100,Yp,0];
+    v.ln(v.p(cx,YT,0),v.p(...pin),'sh'); v.push(`<circle class="sh0" cx="${f(v.p(...pin)[0])}" cy="${f(v.p(...pin)[1])}" r="3.2"/>`);
+    v.ln(v.p(...pin),v.p(...arm),'sh');
+    v.ln(v.p(...piv),v.p(...roll),'sh'); v.push(`<circle class="sh0" cx="${f(v.p(...arm)[0])}" cy="${f(v.p(...arm)[1])}" r="3.2"/>`);
+    v.push(`<circle class="sh0" cx="${f(v.p(...piv)[0])}" cy="${f(v.p(...piv)[1])}" r="5"/>`); v.hatch([230,Yp+10,0],180);
+    v.push(`<circle class="t" cx="${f(v.p(...roll)[0])}" cy="${f(v.p(...roll)[1])}" r="5.5"/>`);
+    // 滑板(移动副)+ 工作台
+    v.rect([-25,Yc-70,0],[145,Yc+90,0],'t'); v.ln(v.p(-25,Yc-70,0),v.p(-25,Yc-95,0),'t'); v.ln(v.p(145,Yc-70,0),v.p(145,Yc-95,0),'t');
+    v.gear('Z',[60,Yc,0],r.work,'g'); v.end([60,Yc,0]);
+    zig(v,[130,Yc-70,0],[130,Yc-115,0]); v.hatch([130,Yc-118,0],0);
+    dbl(v,[-45,Yc-20,0],[-45,Yc+20,0]); v.name([-45,Yc,0],-8,4,'进给 ±'+P.feed.amp.toFixed(1)+' mm','end');
+    v.rot([60,Yc,0],'Z',k.table,22); v.rot([cx,YT,0],'X',0,1);
+    [['5',[P.III.X+20,P.II.Y,0],-8,-34],['7',[P.III.X,P.IV.Y,0],-36,-6],['7w',[P.W.X,P.IV.Y,0],-4,-40],['8',[P.W.X+20,P.IV.Y,0],30,28],['19',[250,(P.IV.Y+YT)/2,0],34,0],
+     ['21',[cx,YT,0],-34,10],['20',[cx,(YT+Yp)/2,0],-30,4],['18',[190,Yp,0],0,-26],['17',[230,Yp,0],24,-22],['16',[100,Yp,0],-24,-18],['23',[130,Yc-90,0],30,0],['15',[60,Yc,0],56,-18],['22',[57,Yc+65,0],-26,24]]
+     .forEach(a => v.num(a[1],a[2],a[3],a[0]));
+    v.name([60,Yc+r.work+14,0],-95,-60,'滑板沿Y往复','middle');
+    return {w:600,h:470,body:v.html(),cap:'俯视图(沿−Z看，X向右、Y向上)：Ⅳ轴→链19→伸缩轴21→曲柄21→连杆20→摇杆18(绕立柱17)→滚子16推动滑板，弹簧23回位，工作台沿Y往复进给。'};
+  };
+})();
+
+/* 页面逻辑：场景、相机、分段高亮、标签、动画 */
+(function(){
+const canvas = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, preserveDrawingBuffer:true});
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(32, 1, 10, 6000);
+scene.add(new T3.HemisphereLight(0xffffff, 0x445566, .9));
+const dl = new T3.DirectionalLight(0xffffff, .9); dl.position.set(600,900,500); scene.add(dl);
+const machine = buildMachine(scene);
+const SECCOL = {pub:0xd9a21b, gen:0x1f9e8f, cut:0xd1495b, feed:0x6a5acd};
+const secOf = {}; YJ.PARTS.forEach(p => secOf[p[0]] = p[3].split(' '));
+const state = {sec:'all', phi:0, speed:1, playing:true, labels:true, view:{th:Math.PI*0.25, ph:1.0, d:1500, tx:60, ty:110, tz:120}};
+const VIEWS = {iso:{th:Math.PI/4, ph:1.0, d:1550}, front:{th:0, ph:1.5, d:1500}, top:{th:0, ph:.1, d:1500}, left:{th:-Math.PI/2+.0001, ph:1.4, d:1500}, back:{th:Math.PI, ph:1.2, d:1500}};
+function setView(n){ Object.assign(state.view, VIEWS[n]); }
+function camUpdate(){
+  const v = state.view, c = new T3.Vector3(...[v.tx, v.tz, -v.ty]);
+  // th: 方位角，0 = 从 -Y 方向看(屏幕右=+X)；π/4 = 示意图视角(从 +X,-Y 方向)
+  const x = c.x + v.d*Math.sin(v.ph)*Math.sin(v.th), z = c.z + v.d*Math.sin(v.ph)*Math.cos(v.th), y = c.y + v.d*Math.cos(v.ph);
+  cam.position.set(x,y,z); cam.lookAt(c);
+}
+function resize(){ const r = canvas.parentElement.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); cam.aspect = r.width/r.height; cam.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(canvas.parentElement);
+// 拖动旋转 / 滚轮缩放 / 右键平移
+let drag = null;
+canvas.addEventListener('pointerdown', e => { drag = {x:e.clientX, y:e.clientY, pan:e.button===2||e.shiftKey}; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove', e => { if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.x=e.clientX; drag.y=e.clientY; const v=state.view;
+  if (drag.pan) { v.tx -= dx*v.d/1100*Math.cos(v.th); v.ty += dx*v.d/1100*Math.sin(v.th)*-1; v.tz += dy*v.d/1100; }
+  else { v.th -= dx*.006; v.ph = Math.min(Math.PI-.05, Math.max(.05, v.ph - dy*.006)); } });
+canvas.addEventListener('pointerup', () => drag=null);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('wheel', e => { e.preventDefault(); state.view.d = Math.min(4000, Math.max(300, state.view.d*(1+e.deltaY*.001))); }, {passive:false});
+// 分段高亮
+const lab = {}, labBox = document.getElementById('labels');
+YJ.PARTS.forEach(p => { const el = document.createElement('span'); el.className='lb'; el.textContent = p[0]; el.dataset.id = p[0]; el.title = p[1]; labBox.appendChild(el); lab[p[0]] = el; });
+function inSec(parts) { return state.sec==='all' || parts.some(id => (secOf[id]||[]).includes(state.sec)); }
+function applySection(){
+  const col = new T3.Color(SECCOL[state.sec]||0xffffff);
+  meshes.forEach(m => {
+    const on = inSec(m.userData.parts), mt = m.material;
+    mt.transparent = true;
+    const base = new T3.Color(m.userData.base);
+    if (state.sec==='all') { mt.color.copy(base); mt.emissive && mt.emissive.setHex(0x000000); mt.opacity = m.userData.op||1; }
+    else if (on) { mt.color.copy(base).lerp(col,.25); mt.emissive && mt.emissive.copy(col).multiplyScalar(.28); mt.opacity = Math.max(m.userData.op||1, .9); }
+    else { mt.color.copy(base).lerp(new T3.Color(0x8a949c),.7); mt.emissive && mt.emissive.setHex(0x000000); mt.opacity = .12; }
+    mt.depthWrite = on || state.sec==='all' ? !(m.userData.op) : false;
+  });
+  machine.lines.forEach(l => { l.material.transparent = true; l.material.opacity = inSec(l.userData.parts)?1:.15; });
+  Object.keys(lab).forEach(id => lab[id].classList.toggle('dim', !inSec([id])));
+  document.querySelectorAll('[data-sec]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sec===state.sec)));
+  window.dispatchEvent(new CustomEvent('sectionchange',{detail:state.sec}));
+}
+function setSection(s){ state.sec = s; applySection(); }
+// 标签投影
+const tmp = new T3.Vector3();
+function placeLabels(){
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  Object.keys(lab).forEach(id => {
+    const a = machine.anchors[id]; const el = lab[id];
+    if (!a || !state.labels) { el.style.display='none'; return; }
+    tmp.copy(W(a[0],a[1],a[2])).project(cam);
+    if (tmp.z>1) { el.style.display='none'; return; }
+    el.style.display=''; el.style.transform = `translate(${(tmp.x*.5+.5)*w}px,${(-tmp.y*.5+.5)*h}px) translate(-50%,-50%)`;
+  });
+}
+// 主循环
+let last = performance.now(), info = document.getElementById('info');
+const gz = document.getElementById('gizmo');
+function gizmo(){ if(!gz) return; const m=new T3.Matrix4().extractRotation(cam.matrixWorldInverse);
+  [['X',[1,0,0]],['Y',[0,0,-1]],['Z',[0,1,0]]].forEach(([n,v])=>{ const q=new T3.Vector3(...v).applyMatrix4(m); const l=gz.querySelector('.g'+n), t=gz.querySelector('.t'+n);
+    l.setAttribute('x2',32+q.x*22); l.setAttribute('y2',32-q.y*22); t.setAttribute('x',32+q.x*29); t.setAttribute('y',36-q.y*29); }); }
+function frame(now){
+  const dt = Math.min(.05,(now-last)/1000); last = now;
+  if (state.playing) state.phi += dt * 2*Math.PI * state.speed;
+  const r = machine.update(state.phi);
+  camUpdate(); cam.updateMatrixWorld(); resize_(); renderer.render(scene, cam); placeLabels(); gizmo();
+  if (info) info.textContent = `曲柄转速 ${(YJ.k.C*state.speed*60).toFixed(0)} r/min · 刀具行程 ${(2*YJ.P.stroke.e)} mm · 刀坯中心距 ${r.a.toFixed(1)} mm`;
+  requestAnimationFrame(frame);
+}
+let sized=false; function resize_(){ if(!sized){ resize(); sized=true; } }
+const bg = () => { const c = getComputedStyle(document.documentElement).getPropertyValue('--stage').trim() || '#eef1f2'; renderer.setClearColor(new T3.Color(c)); };
+new MutationObserver(bg).observe(document.documentElement,{attributes:true}); matchMedia('(prefers-color-scheme: dark)').addEventListener('change',bg); bg();
+// 控件
+document.querySelectorAll('[data-sec]').forEach(b => b.addEventListener('click', () => setSection(b.dataset.sec)));
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+document.getElementById('play').addEventListener('click', e => { state.playing=!state.playing; e.currentTarget.textContent = state.playing?'暂停':'播放'; });
+document.getElementById('speed').addEventListener('input', e => state.speed = parseFloat(e.target.value));
+document.getElementById('lbl').addEventListener('change', e => state.labels = e.target.checked);
+setView('iso'); applySection(); resize(); requestAnimationFrame(frame);
+window.YJapp = {state, setSection, setView, renderer, scene, cam};
+})();
+
+/* 右侧面板：当前部分的国标运动简图、转向/传动比表、零件表 */
+(function(){
+const P = YJ.P, k = YJ.k, esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const AXN = {X:'+X',Y:'+Y',Z:'+Z'};
+const SHAFTS = [  // [名称, 轴向, k, 所属部分]
+  ['电动机轴','X',k.M,'pub'],['Ⅰ轴(带轮2、飞轮F、齿轮3)','X',k.I,'pub'],['Ⅱ轴(齿轮4、锥齿轮5a)','X',k.II,'pub'],
+  ['Ⅲ轴(锥齿轮5b、蜗杆7、链轮10)','Y',k.III,'pub cut gen feed'],
+  ['W轴(蜗轮7w、锥齿轮8b)','Z',k.W,'gen feed'],['Ⅳ轴(锥齿轮8a、挂轮9a、链轮19)','X',k.IV,'gen feed'],
+  ['Ⅵ轴(挂轮9b、链轮11)','X',k.VI,'gen'],['箱内蜗杆轴(蜗杆11、链轮11)','X',k.VII,'gen'],['刀轴(插齿刀14、蜗轮)','Z',k.SP,'gen'],
+  ['曲柄轴(曲柄12、链轮10)','Y',k.C,'cut'],['伸缩传动轴21(链轮19、曲柄21)','X',k.T,'gen feed'],['工作台(轮坯15)','Z',k.table,'gen'],
+];
+const FLOW = {
+  pub:'电动机1 →V带2→ Ⅰ轴(带轮2、飞轮F、齿轮3) →齿轮4→ Ⅱ轴 →锥齿轮副5→ Ⅲ轴',
+  cut:'Ⅲ轴 →链10→ 曲柄轴 →曲柄12、连杆→ 刀架箱体13(带刀轴、插齿刀14)上下往复',
+  gen:'Ⅲ轴 →蜗杆7、蜗轮7w→ W轴 →锥齿轮8→ Ⅳ轴 ⟨刀：挂轮9→链11→蜗杆11→刀轴 · 坯：链19→伸缩轴21→蜗杆22→工作台⟩',
+  feed:'Ⅳ轴 →链19→ 伸缩轴21(曲柄21) →连杆20→ 摇杆18(绕立柱17)→ 滚子16推动滑板，弹簧23回位',
+};
+function ratioText(sec) {
+  if (sec==='gen') return `范成条件：n刀 : n坯 = z坯 : z刀 = ${P.z.zw} : ${P.z.zc}，两者转向相反（外啮合）。模型中 n刀/n电机 = ${Math.abs(k.SP).toExponential(2)}，n坯/n电机 = ${Math.abs(k.table).toExponential(2)}，比值 ${(Math.abs(k.SP/k.table)).toFixed(3)} = ${P.z.zw/P.z.zc}。`;
+  if (sec==='cut') return `曲柄转速 = n电机 × ${k.C.toFixed(3)}（带 ${P.r.P2/P.r.P1} ∶ 1、齿轮 ${P.z.z3}/${P.z.z4}、链 1 ∶ 1）。刀具行程 2e = ${2*P.stroke.e} mm，连杆长 ${P.stroke.L} mm。`;
+  if (sec==='feed') return `摇杆杠杆比 ${P.feed.kLever.toFixed(2)}，曲柄偏心 ${P.feed.e} mm，滑板往复幅度 ±${P.feed.amp.toFixed(2)} mm；曲柄转速 = n电机 × ${k.T.toFixed(4)}。`;
+  if (sec==='pub') return `电动机 → Ⅲ轴：带 ${P.r.P2/P.r.P1} ∶ 1，齿轮 ${P.z.z3}/${P.z.z4} = ${P.z.z3/P.z.z4}，等径锥齿轮 1 ∶ 1，所以 n_Ⅲ = n电机 × ${k.III.toFixed(3)}。`;
+  return '选择上方一个运动部分，查看对应的国标运动简图、各轴转向与传动比。图中数字与三维模型上的编号一致。';
+}
+function sense(kk, ax) { return `${kk>0?'↺ 逆时针':'↻ 顺时针'}（迎着 ${AXN[ax]} 方向看）`; }
+function render(sec) {
+  const dwg = document.getElementById('dwg'), tbl = document.getElementById('tbl'), note = document.getElementById('note');
+  const names = YJ.SEC, parts = YJ.PARTS.filter(p => sec==='all' || p[3].split(' ').includes(sec));
+  if (sec==='all') {
+    dwg.innerHTML = `<h2>四个运动部分</h2><p class="sub">点击上方标签，三维模型会只高亮该部分，这里同步显示它的运动简图。</p>` +
+      Object.keys(FLOW).map(s => `<p style="margin:10px 0;font-size:13.5px;line-height:1.7"><b style="color:var(--${s})">${names[s]}</b><br>${FLOW[s]}</p>`).join('');
+  } else {
+    const d = DWG[sec]();
+    dwg.innerHTML = `<h2 style="color:var(--${sec})">${names[sec]}　机构运动简图</h2><p class="sub">GB/T 4460 机构运动简图符号 · 按空间位置正投影</p><div class="scroll"><svg viewBox="0 0 ${d.w} ${d.h}" role="img" aria-label="${names[sec]}运动简图">${d.body}</svg></div><p class="sub" style="margin-top:6px">${d.cap}</p>`;
+  }
+  const shafts = SHAFTS.filter(s => sec==='all' || s[3].split(' ').includes(sec));
+  tbl.innerHTML = (sec==='all'?'':`<tr><th colspan="3">各轴转向（模型中的真实转向）与转速比</th></tr>` + shafts.map(s => `<tr><td colspan="2">${s[0]}　<span style="color:var(--mute)">∥${s[1]}</span></td><td>${sense(s[2],s[1])}　<span style="font-family:var(--mono)">${Math.abs(s[2]).toExponential(2)}</span></td></tr>`).join('')) +
+    `<tr><th>编号</th><th>名称</th><th>类型</th></tr>` + parts.map(p => `<tr><td class="n">${p[0]}</td><td>${esc(p[1])}</td><td>${esc(p[2])}</td></tr>`).join('');
+  note.innerHTML = `<b>${sec==='all'?'说明':names[sec]}</b>：${ratioText(sec)}<br>说明：转速比取示意值；零件名称由示意图和实物照片推断，编号以示意图为准。图的坐标系与三维模型相同：X 向右前，Y 向右后，Z 向上。`;
+}
+window.addEventListener('sectionchange', e => render(e.detail));
+render('all');
+})();
+
+</script>
